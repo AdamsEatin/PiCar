@@ -1,80 +1,135 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 22 23:03:21 2018
+
+@author: Adam
+
+
+GPIO 11 - Front Left Wheel Backward
+GPIO 13 - Both Right Wheels Forward
+GPIO 15 - Both Right Wheels Backward
+GPIO 22 - Front Left Wheel Forward
+
+
+GPIO 35, 36, 37, 38, 40 - LEDs
+"""
+
 import RPi.GPIO as gpio
+import curses
 import time
-import sys
-import Tkinter as tk
-from sensor import distance
+import os
+
 
 def init():
     gpio.setmode(gpio.BOARD)
-    gpio.setup(7, gpio.OUT)
+    # Motors
     gpio.setup(11, gpio.OUT)
     gpio.setup(13, gpio.OUT)
     gpio.setup(15, gpio.OUT)
-
-def reverse(tf):
-    gpio.output(7, False)
-    gpio.output(11, True)
-    gpio.output(13, False)
-    gpio.output(15, True)
-    time.sleep(tf)
+    gpio.setup(22, gpio.OUT)
     
-def forward(tf):
-    gpio.output(7, True)
+    # LEDs
+    gpio.setup(35, gpio.OUT)
+    gpio.setup(36, gpio.OUT)
+    gpio.setup(37, gpio.OUT)
+    gpio.setup(38, gpio.OUT)
+    gpio.setup(40, gpio.OUT)
+
+
+def forward(tval):
     gpio.output(11, False)
     gpio.output(13, True)
     gpio.output(15, False)
-    time.sleep(tf)
+    gpio.output(22, True)
+    time.sleep(tval)
     
-def turn_right(tf):
-    gpio.output(7, True)
-    gpio.output(11, False)
+def reverse(tval):
+    gpio.output(11, True)
     gpio.output(13, False)
     gpio.output(15, True)
-    time.sleep(tf)
-    
-def turn_left(tf):
-    gpio.output(7, False)
+    gpio.output(22, False)
+    time.sleep(tval)
+       
+def turn_left(tval):
     gpio.output(11, True)
     gpio.output(13, True)
     gpio.output(15, False)
-    time.sleep(tf)
-
-def stop(tf):
-    gpio.output(7, False)
+    gpio.output(22, False)
+    time.sleep(tval)
+      
+def turn_right(tval):
+    gpio.output(11, False)
+    gpio.output(13, False)
+    gpio.output(15, True)
+    gpio.output(22, True)
+    time.sleep(tval)
+    
+def stop(tval):
     gpio.output(11, False)
     gpio.output(13, False)
     gpio.output(15, False)
-    time.sleep(tf)
-    gpio.cleanup()
+    gpio.output(22, False)
+    time.sleep(tval)
 
-def key_input(event):
+
+def lights_on():
+    gpio.output(35, True)
+    gpio.output(36, True)
+    gpio.output(37, True)
+    gpio.output(38, True)
+    gpio.output(40, True)
+    
+def lights_off():
+    gpio.output(35, False)
+    gpio.output(36, False)
+    gpio.output(37, False)
+    gpio.output(38, False)
+    gpio.output(40, False)
+    
+def main(win):
     init()
-    print "Key:", event.char
-    key_press = event.char
-    sleep_time = 0.060
+    sleep_val = 0.060
     
-    if key_press.lower() == "w":
-        forward(sleep_time)
-    elif key_press.lower() == "s":
-        reverse(sleep_time)
-    elif key_press.lower() == "a":
-        turn_left(sleep_time)
-    elif key_press.lower() == "d":
-        turn_right(sleep_time)
-    elif key_press.lower() == "p":
-        stop(sleep_time) 
-    else:
-        pass
-
-    curDis = distance("cm")
-    print("Distance:", curDis)
+    win.nodelay(True)
+    key=""
+    msg = ""
+    win.clear()                
+    win.addstr("Detected: ")
     
-    if curDis <15:
-        init()
-        reverse(0.5)
+    while 1:          
+        try:                 
+           key = win.getkey()         
+           win.clear()                
+           win.addstr("Detected: ", str(key))
+           #win.addstr(str(key))
+           win.addstr("\n", msg)
+           
+           if str(key) == "w":
+               forward(sleep_val)
+               lights_off()
+               
+           elif str(key) == "s":
+               reverse(sleep_val)
+               lights_on()
+               
+           elif str(key) == "a":
+               turn_left(sleep_val)
+               lights_off()
+               
+           elif str(key) == "d":
+               turn_right(sleep_val)
+               lights_off()
+               
+           elif str(key) == "q":
+               stop(sleep_val)
+               lights_off()
+               
+           elif str(key) == "p":
+               lights_off()
+               gpio.cleanup()
+               break           
+        except Exception as e:
+           # No input   
+           pass         
 
-command = tk.TK()
-command.bind('<keypress>', key_input)
-command.mainloop()
-
-    
+curses.wrapper(main)
