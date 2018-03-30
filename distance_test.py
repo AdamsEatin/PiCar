@@ -1,41 +1,24 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 """
-Created on Fri Mar 23 09:59:43 2018
+@author: Adam Eaton
 
-@author: Adam
+Script to get a reading from the distance sensor.
 """
 
+from hcsr04sensor import sensor
 import RPi.GPIO as GPIO
-import time
 
-GPIO.setmode(GPIO.BCM)
-
-TRIG = 23
-ECHO = 24
-
-print "Distance Measurement In Progress"
-
-GPIO.setup(TRIG, GPIO.OUT)
-GPIO.setup(ECHO, GPIO.IN)
-
-GPIO.output(TRIG, False)
-print "Waiting for Sensor"
-time.sleep(2)
-
-GPIO.output(TRIG, True)
-time.sleep(0.00001)
-GPIO.output(TRIG, False)
-
-while GPIO.input(ECHO) == 0:
-    pulse_start() = time.time()
+def main():
+    trig_pin = 12
+    echo_pin = 18
     
-while GPIO.input(ECHO) == 1:
-    pulse_end = time.time()
+    value = sensor.Measurement(trig_pin, echo_pin, gpio_mode=GPIO.BOARD)
+    raw_measurement = value.raw_distance()
     
-pulse_duration = pulse_end - pulse_start
-
-distance = pulse_duration * 17150
-distance = round(distance, 2)
-
-print "Distance: ",distance,"cm"
+    metric_distance = value.distance_metric(raw_measurement)
+    
+    return metric_distance
+    
+dist = main()
+print(dist)
 GPIO.cleanup()

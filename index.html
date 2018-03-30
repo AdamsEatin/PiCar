@@ -1,0 +1,44 @@
+<html>
+<head>
+<title>PiCar!</title>
+</head>	
+
+<body>
+<img src="stream.mjpg" width="640" height="480" />
+<br><br>
+
+<h3 style="display:inline-block;">W - Forward</h3>&emsp;&emsp;&emsp;
+<h3 style="display:inline-block;">A - Left </h3>&emsp;&emsp;&emsp;&emsp;
+<h3 style="display:inline-block;">D - Right</h3>&emsp;&emsp;&emsp;&emsp;
+<h3 style="display:inline-block;">S - Backward</h3>&emsp;&emsp;&emsp;
+<h3 style="display:inline-block;">Q - Stop</h3>
+
+<h4>Enter the action associated buttons in the text field below to drive the car!</h4>
+<input type="text" size="40" onkeypress="control(event)">
+
+<script>
+function control(event){
+	var xhr = new XMLHttpRequest();
+	var key = event.which || event.keyCode;
+	
+	if(key == 119){
+		xhr.open('GET', "/forward", false);
+		xhr.send();
+	}else if(key == 97){
+		xhr.open('GET', "/left", false);
+		xhr.send();
+	}else if(key == 100){
+		xhr.open('GET', "/right", false);
+		xhr.send();
+	}else if(key == 115){
+		xhr.open('GET', "/back", false);
+		xhr.send();
+	}else if(key == 113){
+		xhr.open('GET', "/stop", false);
+		xhr.send();
+	}
+}
+</script>
+
+</body>
+</html>

@@ -1,135 +1,109 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 """
-Created on Thu Mar 22 23:03:21 2018
+@author: Adam Eaton
 
-@author: Adam
-
-
-GPIO 11 - Front Left Wheel Backward
-GPIO 13 - Both Right Wheels Forward
-GPIO 15 - Both Right Wheels Backward
-GPIO 22 - Front Left Wheel Forward
-
-
-GPIO 35, 36, 37, 38, 40 - LEDs
+Stream Server for PiCar
 """
 
-import RPi.GPIO as gpio
-import curses
-import time
-import os
+import io
+import picamera
+import logging
+import socketserver
+from threading import Condition
+from http import server
+
+import Controller as CTRL
+
+with open('/home/pi/Desktop/PiCar/index.html', 'r') as file:
+    PAGE=file.read().replace('\n','')
+
+class StreamingOutput(object):
+    def __init__(self):
+        self.frame = None
+        self.buffer = io.BytesIO()
+        self.condition = Condition()
+
+    def write(self, buf):
+        if buf.startswith(b'\xff\xd8'):
+            # New frame, copy the existing buffer's content and notify all
+            # clients it's available
+            self.buffer.truncate()
+            with self.condition:
+                self.frame = self.buffer.getvalue()
+                self.condition.notify_all()
+            self.buffer.seek(0)
+        return self.buffer.write(buf)
 
 
-def init():
-    gpio.setmode(gpio.BOARD)
-    # Motors
-    gpio.setup(11, gpio.OUT)
-    gpio.setup(13, gpio.OUT)
-    gpio.setup(15, gpio.OUT)
-    gpio.setup(22, gpio.OUT)
-    
-    # LEDs
-    gpio.setup(35, gpio.OUT)
-    gpio.setup(36, gpio.OUT)
-    gpio.setup(37, gpio.OUT)
-    gpio.setup(38, gpio.OUT)
-    gpio.setup(40, gpio.OUT)
+class StreamingHandler(server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.send_response(301)
+            self.send_header('Location', '/index.html')
+            self.end_headers()
+            
+        elif self.path == '/index.html':
+            content = PAGE.encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.send_header('Content-Length', len(content))
+            self.end_headers()
+            CTRL.init()
+            self.wfile.write(content)
+            
+        elif self.path == '/forward':
+            self.send_response(200)
+            CTRL.forward()
+        elif self.path == '/left':
+            self.send_response(200)
+            CTRL.left()
+        elif self.path == '/right':
+            self.send_response(200)
+            CTRL.right()
+        elif self.path == '/back':
+            self.send_response(200)
+            CTRL.back()
+        elif self.path == '/stop':
+            self.send_response(200)
+            CTRL.stop()
+
+        elif self.path == '/stream.mjpg':
+            self.send_response(200)
+            self.send_header('Age', 0)
+            self.send_header('Cache-Control', 'no-cache, private')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
+            self.end_headers()
+            try:
+                while True:
+                    with output.condition:
+                        output.condition.wait()
+                        frame = output.frame
+                    self.wfile.write(b'--FRAME\r\n')
+                    self.send_header('Content-Type', 'image/jpeg')
+                    self.send_header('Content-Length', len(frame))
+                    self.end_headers()
+                    self.wfile.write(frame)
+                    self.wfile.write(b'\r\n')
+            except Exception as e:
+                logging.warning(
+                    'Removed streaming client %s: %s',
+                    self.client_address, str(e))
+        else:
+            self.send_error(404)
+            self.end_headers()
 
 
-def forward(tval):
-    gpio.output(11, False)
-    gpio.output(13, True)
-    gpio.output(15, False)
-    gpio.output(22, True)
-    time.sleep(tval)
-    
-def reverse(tval):
-    gpio.output(11, True)
-    gpio.output(13, False)
-    gpio.output(15, True)
-    gpio.output(22, False)
-    time.sleep(tval)
-       
-def turn_left(tval):
-    gpio.output(11, True)
-    gpio.output(13, True)
-    gpio.output(15, False)
-    gpio.output(22, False)
-    time.sleep(tval)
-      
-def turn_right(tval):
-    gpio.output(11, False)
-    gpio.output(13, False)
-    gpio.output(15, True)
-    gpio.output(22, True)
-    time.sleep(tval)
-    
-def stop(tval):
-    gpio.output(11, False)
-    gpio.output(13, False)
-    gpio.output(15, False)
-    gpio.output(22, False)
-    time.sleep(tval)
+class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
-
-def lights_on():
-    gpio.output(35, True)
-    gpio.output(36, True)
-    gpio.output(37, True)
-    gpio.output(38, True)
-    gpio.output(40, True)
-    
-def lights_off():
-    gpio.output(35, False)
-    gpio.output(36, False)
-    gpio.output(37, False)
-    gpio.output(38, False)
-    gpio.output(40, False)
-    
-def main(win):
-    init()
-    sleep_val = 0.060
-    
-    win.nodelay(True)
-    key=""
-    msg = ""
-    win.clear()                
-    win.addstr("Detected: ")
-    
-    while 1:          
-        try:                 
-           key = win.getkey()         
-           win.clear()                
-           win.addstr("Detected: ", str(key))
-           #win.addstr(str(key))
-           win.addstr("\n", msg)
-           
-           if str(key) == "w":
-               forward(sleep_val)
-               lights_off()
-               
-           elif str(key) == "s":
-               reverse(sleep_val)
-               lights_on()
-               
-           elif str(key) == "a":
-               turn_left(sleep_val)
-               lights_off()
-               
-           elif str(key) == "d":
-               turn_right(sleep_val)
-               lights_off()
-               
-           elif str(key) == "q":
-               stop(sleep_val)
-               lights_off()
-               
-           elif str(key) == "p":
-               lights_off()
-               gpio.cleanup()
-               break           
-        except Exception as e:
-           # No input   
-           pass         
-
-curses.wrapper(main)
+with picamera.PiCamera(resolution='640x480', framerate=24) as camera:
+    output = StreamingOutput()
+    camera.start_recording(output, format='mjpeg')
+    try:
+        address = ('', 8000)
+        server = StreamingServer(address, StreamingHandler)
+        server.serve_forever()
+    finally:
+        camera.stop_recording()
